@@ -6,7 +6,7 @@ Incluye división automática 80/20 y balanceo de clases.
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder
 from sklearn.utils import resample
 import yaml
 import os
@@ -29,6 +29,7 @@ class DataLoader:
             self.config = yaml.safe_load(file)
         
         self.scaler = None
+        self.encoder = None
         self.feature_names = None
         self.target_column = None
         
@@ -82,6 +83,9 @@ class DataLoader:
         # Limpiar datos
         data_clean = self._clean_data(data)
         
+        # Codificar categóricas antes de balancear/normalizar
+        data_clean = self._encode_categoricals(data_clean)
+
         # Balancear clases si es necesario
         if balance_classes and self.target_column:
             data_clean = self._balance_classes(data_clean)
@@ -108,6 +112,33 @@ class DataLoader:
         
         print(f"Datos después de limpieza: {data_clean.shape}")
         return data_clean
+
+    def _encode_categoricals(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Codifica variables categóricas con OneHotEncoder y guarda el encoder."""
+        # Excluir columna objetivo de la codificación
+        features_df = data.drop(columns=[self.target_column]) if self.target_column and self.target_column in data.columns else data.copy()
+
+        categorical_columns = features_df.select_dtypes(include=['object', 'category']).columns.tolist()
+        if not categorical_columns:
+            return data
+
+        self.encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+        encoded_array = self.encoder.fit_transform(features_df[categorical_columns])
+        encoded_cols = self.encoder.get_feature_names_out(categorical_columns)
+
+        # Construir nuevo DataFrame con numéricas + codificadas + target (si aplica)
+        numeric_df = features_df.drop(columns=categorical_columns)
+        encoded_df = pd.DataFrame(encoded_array, columns=encoded_cols, index=features_df.index)
+        merged_features = pd.concat([numeric_df, encoded_df], axis=1)
+
+        if self.target_column and self.target_column in data.columns:
+            merged = pd.concat([merged_features, data[[self.target_column]]], axis=1)
+        else:
+            merged = merged_features
+
+        # Actualizar feature names
+        self.feature_names = [c for c in merged.columns if c != self.target_column]
+        return merged
     
     def _balance_classes(self, data: pd.DataFrame) -> pd.DataFrame:
         """Balancea las clases usando oversampling."""

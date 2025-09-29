@@ -64,10 +64,10 @@ pip install -r requirements.txt
 ### 2. Uso Básico
 ```bash
 # Con datos de ejemplo
-python main.py --data datos_ejemplo.csv --target target
+python main.py --data datos_ejemplo.csv --target target --seed 42
 
 # Con tus propios datos
-python main.py --data tu_archivo.csv --target columna_objetivo
+python main.py --data tu_archivo.csv --target columna_objetivo --seed 42
 ```
 
 ### 3. Sistema de Pickle - Gestión de Experimentos
@@ -108,13 +108,13 @@ python pickle_utils.py --action cleanup --keep_last 5
 ### 3. Opciones Avanzadas
 ```bash
 # Más muestras sintéticas
-python main.py --data datos.csv --target target --samples 5000
+python main.py --data datos.csv --target target --samples 5000 --seed 42
 
 # Configuración específica
-python main.py --data datos.csv --target target --config configs/config_simple.yaml
+python main.py --data datos.csv --target target --config configs/config_simple.yaml --seed 42
 
 # Directorio de salida personalizado
-python main.py --data datos.csv --target target --output mi_resultado
+python main.py --data datos.csv --target target --output mi_resultado --seed 42
 ```
 
 ### 4. Parámetros Disponibles
@@ -123,6 +123,7 @@ python main.py --data datos.csv --target target --output mi_resultado
 - `--output`: Directorio de salida (default: results)
 - `--samples`: Número de muestras sintéticas a generar (default: 1000)
 - `--config`: Archivo de configuración (default: configs/config.yaml)
+- `--seed`: Semilla para reproducibilidad (default: 42)
 
 ## ⚙️ Configuraciones Disponibles
 

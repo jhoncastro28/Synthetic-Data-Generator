@@ -584,7 +584,7 @@ class GANTrainer:
             self.gan_model.discriminator,
             f"{experiment_name}_discriminator", 
             epoch,
-            {'input_dim': self.gan_model.discriminator.input_shape[-1]}
+            {'input_dim': getattr(self.gan_model.discriminator, 'input_dim', None)}
         )
         
         print(f"Estado de entrenamiento guardado para época {epoch}")

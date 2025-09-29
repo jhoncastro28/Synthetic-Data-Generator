@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
+import random
 
 # Agregar src al path
 sys.path.append('src')
@@ -31,12 +32,26 @@ def main():
     parser.add_argument('--output', type=str, default='results', help='Directorio de salida')
     parser.add_argument('--samples', type=int, default=1000, help='Número de muestras sintéticas')
     parser.add_argument('--config', type=str, default='configs/config.yaml', help='Archivo de configuración')
+    parser.add_argument('--seed', type=int, default=42, help='Semilla para reproducibilidad')
     
     args = parser.parse_args()
     
     print("GENERADOR DE DATOS SINTETICOS CON GAN")
     print("=" * 50)
     
+    # Semillas globales
+    try:
+        import tensorflow as tf
+    except Exception:
+        tf = None
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    if tf is not None:
+        try:
+            tf.random.set_seed(args.seed)
+        except Exception:
+            pass
+
     # Crear directorios
     Path(args.output).mkdir(parents=True, exist_ok=True)
     
@@ -122,7 +137,9 @@ def main():
         
         # 6. Evaluar calidad
         print("\nEvaluando calidad...")
-        evaluator = SyntheticDataEvaluator(X_val[:args.samples], synthetic_data)
+        # Alinear tamaños para evaluación
+        n = min(X_val.shape[0], synthetic_data.shape[0], args.samples)
+        evaluator = SyntheticDataEvaluator(X_val[:n], synthetic_data[:n])
         metrics = evaluator.calculate_all_metrics()
         
         print(f"   CrC1RS Score: {metrics['crc1rs_score']:.4f}")
