@@ -219,12 +219,4 @@ El sistema genera automáticamente:
 - **Exportación**: Extraer experimentos completos
 - **Comparación**: Analizar múltiples experimentos
 
-## 🎯 Casos de Uso
-
-- Datos financieros
-- Datos médicos
-- Datos de marketing
-- Datos de IoT
-- Datos demográficos
-
 ---
