@@ -18,6 +18,8 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import optimizers, callbacks
 
+from ..utils.pickle_manager import PickleManager
+
 from ..models.gan import GAN, ConditionalGAN
 from ..utils.metrics import SyntheticDataEvaluator
 from ..utils.data_loader import DataLoader
@@ -49,6 +51,9 @@ class GANTrainer:
         self.results_dir = results_dir
         self.use_tensorboard = use_tensorboard
         self.use_wandb = use_wandb
+        
+        # Inicializar PickleManager
+        self.pickle_manager = PickleManager(results_dir)
         
         # Crear directorios
         self._create_directories()
@@ -124,7 +129,9 @@ class GANTrainer:
               train_data: np.ndarray,
               validation_data: np.ndarray,
               feature_names: Optional[List[str]] = None,
-              class_labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+              class_labels: Optional[np.ndarray] = None,
+              start_epoch: int = 0,
+              experiment_name: str = None) -> Dict[str, Any]:
         """
         Entrena el modelo GAN.
         
@@ -244,13 +251,15 @@ class GANTrainer:
                               train_dataset: tf.data.Dataset,
                               validation_data: np.ndarray,
                               feature_names: Optional[List[str]],
-                              class_labels: Optional[np.ndarray]):
+                              class_labels: Optional[np.ndarray],
+                              start_epoch: int = 0,
+                              experiment_name: str = None):
         """Loop de entrenamiento manual con evaluación personalizada."""
         epochs = self.config['training']['epochs']
         save_interval = self.config['training']['save_interval']
         log_interval = self.config['logging']['log_interval']
         
-        for epoch in range(epochs):
+        for epoch in range(start_epoch, epochs):
             # Entrenar una época
             epoch_metrics = self._train_epoch(train_dataset)
             
@@ -272,12 +281,12 @@ class GANTrainer:
             if epoch % log_interval == 0:
                 self._log_epoch(epoch, epoch_metrics)
             
-            # Guardar modelo periódicamente
+            # Guardar estado completo con pickle
             if epoch % save_interval == 0 and epoch > 0:
                 try:
-                    self._save_checkpoint(epoch)
+                    self.save_training_state(epoch, experiment_name)
                 except Exception as e:
-                    print(f"Error guardando checkpoint: {e}")
+                    print(f"Error guardando estado: {e}")
             
             # Early stopping check
             if self._check_early_stopping():
@@ -533,3 +542,211 @@ class GANTrainer:
     def generate_synthetic_data(self, num_samples: int) -> np.ndarray:
         """Genera datos sintéticos usando el modelo entrenado."""
         return self.gan_model.generate_synthetic_data(num_samples)
+    
+    def save_training_state(self, epoch: int, experiment_name: str = None):
+        """
+        Guarda el estado completo del entrenamiento.
+        
+        Args:
+            epoch: Época actual
+            experiment_name: Nombre del experimento
+        """
+        if experiment_name is None:
+            experiment_name = f"gan_experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Preparar estado del entrenador
+        trainer_state = {
+            'training_history': self.training_history,
+            'best_crc1rs_score': self.best_crc1rs_score,
+            'best_model_path': self.best_model_path,
+            'gan_model_state': {
+                'generator_weights': self.gan_model.generator.get_weights(),
+                'discriminator_weights': self.gan_model.discriminator.get_weights(),
+                'latent_dim': self.gan_model.latent_dim,
+                'use_wasserstein': self.gan_model.use_wasserstein
+            }
+        }
+        
+        # Guardar estado usando PickleManager
+        self.pickle_manager.save_training_state(
+            trainer_state, epoch, self.config
+        )
+        
+        # Guardar modelos individuales
+        self.pickle_manager.save_model(
+            self.gan_model.generator,
+            f"{experiment_name}_generator",
+            epoch,
+            {'latent_dim': self.gan_model.latent_dim}
+        )
+        
+        self.pickle_manager.save_model(
+            self.gan_model.discriminator,
+            f"{experiment_name}_discriminator", 
+            epoch,
+            {'input_dim': self.gan_model.discriminator.input_shape[-1]}
+        )
+        
+        print(f"Estado de entrenamiento guardado para época {epoch}")
+    
+    def load_training_state(self, epoch: Optional[int] = None, experiment_name: str = None):
+        """
+        Carga el estado del entrenamiento.
+        
+        Args:
+            epoch: Época específica (opcional)
+            experiment_name: Nombre del experimento
+        """
+        try:
+            # Cargar estado usando PickleManager
+            trainer_state, loaded_epoch, config = self.pickle_manager.load_training_state(epoch)
+            
+            # Restaurar estado del entrenador
+            self.training_history = trainer_state['training_history']
+            self.best_crc1rs_score = trainer_state['best_crc1rs_score']
+            self.best_model_path = trainer_state['best_model_path']
+            
+            # Restaurar pesos de los modelos
+            gan_state = trainer_state['gan_model_state']
+            self.gan_model.generator.set_weights(gan_state['generator_weights'])
+            self.gan_model.discriminator.set_weights(gan_state['discriminator_weights'])
+            
+            print(f"Estado de entrenamiento cargado desde época {loaded_epoch}")
+            return loaded_epoch, config
+            
+        except FileNotFoundError as e:
+            print(f"No se pudo cargar el estado: {e}")
+            return None, None
+    
+    def save_preprocessors(self, data_loader: DataLoader, experiment_name: str):
+        """
+        Guarda los preprocesadores usados.
+        
+        Args:
+            data_loader: DataLoader con preprocesadores
+            experiment_name: Nombre del experimento
+        """
+        try:
+            # Guardar scaler si existe
+            if hasattr(data_loader, 'scaler') and data_loader.scaler is not None:
+                self.pickle_manager.save_preprocessor(
+                    data_loader.scaler,
+                    f"{experiment_name}_scaler",
+                    {'feature_names': getattr(data_loader, 'feature_names', [])}
+                )
+            
+            # Guardar encoder si existe
+            if hasattr(data_loader, 'encoder') and data_loader.encoder is not None:
+                self.pickle_manager.save_preprocessor(
+                    data_loader.encoder,
+                    f"{experiment_name}_encoder",
+                    {'target_column': getattr(data_loader, 'target_column', None)}
+                )
+            
+            print("Preprocesadores guardados")
+            
+        except Exception as e:
+            print(f"Error guardando preprocesadores: {e}")
+    
+    def load_preprocessors(self, experiment_name: str) -> Tuple[Any, Any]:
+        """
+        Carga los preprocesadores guardados.
+        
+        Args:
+            experiment_name: Nombre del experimento
+            
+        Returns:
+            Tupla con (scaler, encoder)
+        """
+        scaler = None
+        encoder = None
+        
+        try:
+            scaler, _ = self.pickle_manager.load_preprocessor(f"{experiment_name}_scaler")
+        except FileNotFoundError:
+            print("Scaler no encontrado")
+        
+        try:
+            encoder, _ = self.pickle_manager.load_preprocessor(f"{experiment_name}_encoder")
+        except FileNotFoundError:
+            print("Encoder no encontrado")
+        
+        return scaler, encoder
+    
+    def save_experiment_results(self, 
+                               synthetic_data: np.ndarray,
+                               feature_names: list,
+                               metrics: Dict,
+                               epoch: int,
+                               experiment_name: str):
+        """
+        Guarda los resultados completos del experimento.
+        
+        Args:
+            synthetic_data: Datos sintéticos generados
+            feature_names: Nombres de las características
+            metrics: Métricas de evaluación
+            epoch: Época del entrenamiento
+            experiment_name: Nombre del experimento
+        """
+        # Guardar datos sintéticos
+        self.pickle_manager.save_synthetic_data(
+            synthetic_data, feature_names, experiment_name, epoch
+        )
+        
+        # Guardar métricas
+        self.pickle_manager.save_metrics(
+            metrics, experiment_name, epoch
+        )
+        
+        # Guardar resultados completos
+        results = {
+            'synthetic_data_shape': synthetic_data.shape,
+            'feature_names': feature_names,
+            'metrics': metrics,
+            'epoch': epoch,
+            'best_crc1rs_score': self.best_crc1rs_score
+        }
+        
+        self.pickle_manager.save_results(
+            results, f"{experiment_name}_complete", 
+            {'epoch': epoch, 'timestamp': datetime.now().isoformat()}
+        )
+        
+        print(f"Resultados del experimento guardados para época {epoch}")
+    
+    def resume_training(self, 
+                      train_data: np.ndarray,
+                      validation_data: np.ndarray,
+                      feature_names: Optional[List[str]] = None,
+                      experiment_name: str = None) -> Dict:
+        """
+        Continúa un entrenamiento interrumpido.
+        
+        Args:
+            train_data: Datos de entrenamiento
+            validation_data: Datos de validación
+            feature_names: Nombres de las características
+            experiment_name: Nombre del experimento
+            
+        Returns:
+            Resultados del entrenamiento
+        """
+        if experiment_name is None:
+            experiment_name = f"gan_experiment_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Intentar cargar estado previo
+        loaded_epoch, config = self.load_training_state(experiment_name=experiment_name)
+        
+        if loaded_epoch is not None:
+            print(f"Continuando entrenamiento desde época {loaded_epoch}")
+            start_epoch = loaded_epoch + 1
+        else:
+            print("Iniciando nuevo entrenamiento")
+            start_epoch = 0
+        
+        # Continuar entrenamiento
+        return self.train(
+            train_data, validation_data, feature_names,
+            start_epoch=start_epoch, experiment_name=experiment_name
+        )

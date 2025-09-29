@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from datetime import datetime
 
 # Agregar src al path
 sys.path.append('src')
@@ -86,6 +87,9 @@ def main():
         X_train = train_data[feature_names].values
         X_val = val_data[feature_names].values
         
+        # Crear nombre de experimento
+        experiment_name = f"gan_{Path(args.data).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
         trainer = GANTrainer(
             gan_model=gan,
             results_dir=args.output,
@@ -93,10 +97,14 @@ def main():
             use_wandb=False
         )
         
+        # Guardar preprocesadores
+        trainer.save_preprocessors(data_loader, experiment_name)
+        
         results = trainer.train(
             train_data=X_train,
             validation_data=X_val,
-            feature_names=feature_names
+            feature_names=feature_names,
+            experiment_name=experiment_name
         )
         
         print(f"   Entrenamiento completado")
@@ -120,6 +128,12 @@ def main():
         print(f"   CrC1RS Score: {metrics['crc1rs_score']:.4f}")
         print(f"   Correlacion: {metrics['correlation_score']:.4f}")
         print(f"   Similitud: {metrics['similarity_score']:.4f}")
+        
+        # Guardar resultados completos con pickle
+        trainer.save_experiment_results(
+            synthetic_data, feature_names, metrics, 
+            results.get('final_epoch', 0), experiment_name
+        )
         
         # Generar reporte
         report_path = f'{args.output}/evaluation_report.txt'

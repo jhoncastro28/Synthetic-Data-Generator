@@ -10,6 +10,9 @@ Sistema completo para la generación de datos sintéticos de alta calidad usando
 - **Logging Completo**: Monitoreo con TensorBoard y Weights & Biases
 - **Visualizaciones**: Gráficas comparativas y de evolución del entrenamiento
 - **Checkpoints**: Sistema de guardado automático y early stopping
+- **Sistema de Pickle**: Guardado completo de modelos, preprocesadores y resultados
+- **Continuación de Entrenamientos**: Reanudar entrenamientos interrumpidos
+- **Gestión de Experimentos**: Herramientas para manejar múltiples experimentos
 - **Arquitectura Modular**: Código organizado y reutilizable
 
 ## 📁 Estructura del Proyecto
@@ -65,6 +68,41 @@ python main.py --data datos_ejemplo.csv --target target
 
 # Con tus propios datos
 python main.py --data tu_archivo.csv --target columna_objetivo
+```
+
+### 3. Sistema de Pickle - Gestión de Experimentos
+
+#### Listar Experimentos Guardados
+```bash
+# Listar todos los experimentos
+python pickle_utils.py --action list
+
+# Ver detalles de un experimento
+python pickle_utils.py --action details --experiment gan_datos_20241201_143022
+```
+
+#### Continuar Entrenamientos Interrumpidos
+```bash
+# Listar experimentos disponibles
+python resume_training.py --list
+
+# Continuar un entrenamiento específico
+python resume_training.py --experiment gan_datos_20241201_143022 --data datos_ejemplo.csv --target target --epochs 100
+```
+
+#### Comparar Experimentos
+```bash
+# Comparar múltiples experimentos
+python pickle_utils.py --action compare --experiments exp1 exp2 exp3
+
+# Exportar experimento completo
+python pickle_utils.py --action export --experiment gan_datos_20241201_143022
+```
+
+#### Limpiar Archivos Antiguos
+```bash
+# Mantener solo los últimos 5 archivos de cada tipo
+python pickle_utils.py --action cleanup --keep_last 5
 ```
 
 ### 3. Opciones Avanzadas
@@ -147,10 +185,39 @@ El sistema genera automáticamente:
 - **`results/evaluation_report.txt`**: Reporte detallado de evaluación
 - **`results/comparison_plots.png`**: Visualizaciones comparativas
 
+### Sistema de Pickle - Archivos Guardados
+- **`results/models/`**: Modelos entrenados (generador, discriminador)
+- **`results/preprocessors/`**: Scaler, encoders y preprocesadores
+- **`results/training_state/`**: Estado completo del entrenamiento
+- **`results/results/`**: Resultados y métricas de experimentos
+- **`results/metrics/`**: Métricas de evaluación por época
+- **`results/plots/`**: Gráficas de evolución del entrenamiento
+
 ### Logs de Entrenamiento
 - **`results/logs/`**: Logs de TensorBoard (si está habilitado)
 - **`results/models/`**: Modelos entrenados y checkpoints
 - **`results/plots/`**: Gráficas de evolución del entrenamiento
+
+## 🎯 Beneficios del Sistema de Pickle
+
+### ✅ **Ventajas Principales:**
+
+1. **Ahorro de Tiempo**: No re-entrenar desde cero
+2. **Reproducibilidad**: Resultados consistentes entre sesiones
+3. **Experimentos Iterativos**: Probar diferentes configuraciones
+4. **Colaboración**: Compartir modelos entrenados fácilmente
+5. **Recuperación**: Continuar entrenamientos interrumpidos
+6. **Análisis**: Comparar múltiples experimentos
+7. **Portabilidad**: Mover experimentos entre máquinas
+
+### 🔧 **Funcionalidades del Sistema:**
+
+- **Guardado Automático**: Estado completo cada N épocas
+- **Carga Inteligente**: Restaurar desde cualquier punto
+- **Gestión de Versiones**: Múltiples versiones por experimento
+- **Limpieza Automática**: Mantener solo archivos relevantes
+- **Exportación**: Extraer experimentos completos
+- **Comparación**: Analizar múltiples experimentos
 
 ## 🎯 Casos de Uso
 
