@@ -1,0 +1,48 @@
+# Configuración específica para datos médicos
+# Optimizada para datos con alta dimensionalidad y clases desbalanceadas
+
+# Configuración de datos
+data:
+  train_split: 0.8
+  validation_split: 0.2
+  random_state: 42
+  normalize: true
+  balance_classes: true  # Importante para datos médicos desbalanceados
+
+# Configuración del modelo - Optimizada para datos médicos
+model:
+  latent_dim: 200  # Mayor dimensión para datos de alta dimensionalidad
+  generator_layers: [256, 512, 1024, 2048, 1024, 512]  # Arquitectura muy profunda
+  discriminator_layers: [2048, 1024, 512, 256, 128]  # Discriminador robusto
+  dropout_rate: 0.5  # Alto dropout para regularización
+  use_batch_norm: true
+  activation: "relu"
+  output_activation: "tanh"
+
+# Configuración de entrenamiento - Conservadora para datos sensibles
+training:
+  batch_size: 16  # Batch size pequeño para estabilidad
+  epochs: 3000  # Muchas épocas para convergencia lenta
+  learning_rate_g: 0.00005  # Learning rate muy conservador
+  learning_rate_d: 0.00005
+  beta_1: 0.5
+  beta_2: 0.999
+  save_interval: 50
+  early_stopping_patience: 300
+  gradient_penalty: true
+  penalty_weight: 20.0  # Alto penalty para estabilidad
+
+# Configuración de logging
+logging:
+  log_interval: 25
+  save_plots: true
+  use_tensorboard: true
+  use_wandb: false
+  project_name: "medical_synthetic_data_gan"
+
+# Configuración de evaluación - Muy estricta
+evaluation:
+  metrics: ["statistical", "distributional", "crc1rs", "privacy"]
+  sample_size: 5000  # Muchas muestras para evaluación rigurosa
+  generate_plots: true
+  save_results: true

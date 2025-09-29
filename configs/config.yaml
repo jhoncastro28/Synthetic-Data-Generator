@@ -1,0 +1,47 @@
+# Configuración para el Generador de Datos Sintéticos con GAN
+
+# Configuración de datos
+data:
+  train_split: 0.8
+  validation_split: 0.2
+  random_state: 42
+  normalize: true
+  balance_classes: true
+
+# Configuración del modelo
+model:
+  latent_dim: 100
+  generator_layers: [256, 512, 1024]
+  discriminator_layers: [1024, 512, 256]
+  dropout_rate: 0.3
+  use_batch_norm: true
+  activation: "relu"
+  output_activation: "tanh"
+
+# Configuración de entrenamiento
+training:
+  batch_size: 64
+  epochs: 1000
+  learning_rate_g: 0.0002
+  learning_rate_d: 0.0002
+  beta_1: 0.5
+  beta_2: 0.999
+  save_interval: 50
+  early_stopping_patience: 100
+  gradient_penalty: true
+  penalty_weight: 10.0
+
+# Configuración de logging
+logging:
+  log_interval: 10
+  save_plots: true
+  use_tensorboard: true
+  use_wandb: false
+  project_name: "synthetic_data_gan"
+
+# Configuración de evaluación
+evaluation:
+  metrics: ["statistical", "distributional", "crc1rs"]
+  sample_size: 1000
+  generate_plots: true
+  save_results: true

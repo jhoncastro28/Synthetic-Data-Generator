@@ -1,0 +1,29 @@
+============================================================
+REPORTE DE EVALUACIÓN DE DATOS SINTÉTICOS
+============================================================
+
+RESUMEN EJECUTIVO:
+- Datos reales: 4 muestras, 5 características
+- Datos sintéticos: 4 muestras, 5 características
+- Score CrC1RS: 0.4249
+- Correlación promedio: 0.0000
+- Similitud promedio: 0.5107
+
+MÉTRICAS ESTADÍSTICAS:
+- MSE de medias: 0.966916
+- MSE de desviaciones estándar: 0.227867
+
+MÉTRICAS DISTRIBUCIONALES:
+- Distancia Wasserstein promedio: 0.958252
+- Estadístico KS promedio: 0.650000
+- Divergencia JS promedio: 0.346574
+
+MÉTRICAS CrC1RS DETALLADAS:
+- Score de correlación: 0.0000
+- Score de consistencia: 0.3905
+- Score de robustez: 0.5142
+- Score de similitud: 0.5107
+- Score CrC1RS total: 0.4249
+
+INTERPRETACIÓN:
+REGULAR: Los datos sintéticos necesitan mejoras.

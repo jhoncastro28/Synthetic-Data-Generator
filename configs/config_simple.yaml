@@ -1,0 +1,48 @@
+# Configuración Simple - Para usuarios principiantes
+# Configuración optimizada para facilidad de uso
+
+# Configuración de datos
+data:
+  train_split: 0.8
+  validation_split: 0.2
+  random_state: 42
+  normalize: true
+  balance_classes: true
+
+# Configuración del modelo - Simplificada
+model:
+  latent_dim: 50          # Dimensión latente más pequeña
+  generator_layers: [128, 256, 128]      # Arquitectura simple
+  discriminator_layers: [256, 128, 64]   # Discriminador simple
+  dropout_rate: 0.2       # Menos dropout
+  use_batch_norm: true
+  activation: "relu"
+  output_activation: "tanh"
+
+# Configuración de entrenamiento - Rápida
+training:
+  batch_size: 16          # Batch size muy pequeño
+  epochs: 20             # Muy pocas épocas para demo rápida
+  learning_rate_g: 0.001  # Learning rate más alto
+  learning_rate_d: 0.001
+  beta_1: 0.5
+  beta_2: 0.999
+  save_interval: 5       # Guardar más frecuentemente
+  early_stopping_patience: 5
+  gradient_penalty: false # Sin gradient penalty para simplicidad
+  penalty_weight: 0.0
+
+# Configuración de logging - Mínima
+logging:
+  log_interval: 5        # Log más frecuente
+  save_plots: true
+  use_tensorboard: false # Sin TensorBoard para simplicidad
+  use_wandb: false
+  project_name: "simple_synthetic_data_gan"
+
+# Configuración de evaluación - Básica
+evaluation:
+  metrics: ["statistical", "crc1rs"]  # Solo métricas básicas
+  sample_size: 200       # Menos muestras para velocidad
+  generate_plots: true
+  save_results: true

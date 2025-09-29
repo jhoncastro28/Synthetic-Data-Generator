@@ -1,0 +1,48 @@
+# Configuración específica para datos financieros
+# Optimizada para datos con alta correlación y distribuciones complejas
+
+# Configuración de datos
+data:
+  train_split: 0.8
+  validation_split: 0.2
+  random_state: 42
+  normalize: true
+  balance_classes: false  # Los datos financieros pueden no necesitar balanceo
+
+# Configuración del modelo - Optimizada para datos financieros
+model:
+  latent_dim: 128  # Mayor dimensión latente para datos complejos
+  generator_layers: [512, 1024, 2048, 1024]  # Arquitectura más profunda
+  discriminator_layers: [2048, 1024, 512, 256]  # Discriminador más robusto
+  dropout_rate: 0.4  # Mayor dropout para regularización
+  use_batch_norm: true
+  activation: "leaky_relu"  # Mejor para datos financieros
+  output_activation: "tanh"
+
+# Configuración de entrenamiento - Más conservadora
+training:
+  batch_size: 32  # Batch size más pequeño para estabilidad
+  epochs: 2000  # Más épocas para convergencia
+  learning_rate_g: 0.0001  # Learning rate más conservador
+  learning_rate_d: 0.0001
+  beta_1: 0.5
+  beta_2: 0.999
+  save_interval: 100
+  early_stopping_patience: 200
+  gradient_penalty: true
+  penalty_weight: 15.0  # Mayor penalty para estabilidad
+
+# Configuración de logging
+logging:
+  log_interval: 20
+  save_plots: true
+  use_tensorboard: true
+  use_wandb: false
+  project_name: "financial_synthetic_data_gan"
+
+# Configuración de evaluación - Más estricta
+evaluation:
+  metrics: ["statistical", "distributional", "crc1rs", "correlation"]
+  sample_size: 2000  # Más muestras para evaluación
+  generate_plots: true
+  save_results: true
