@@ -1,223 +1,285 @@
 # Generador de Datos Sintéticos con GAN
 
-Sistema completo para la generación de datos sintéticos de alta calidad usando GANs (Generative Adversarial Networks) con división automática 80/20 y métricas de evaluación avanzadas.
+Sistema completo para la generación de datos sintéticos utilizando Redes Generativas Adversarias (GANs) con TensorFlow/Keras.
 
-## 🚀 Características Principales
+## 📋 Descripción
 
-- **División Automática 80/20**: División automática de datos para entrenamiento y validación
-- **Balanceo de Clases**: Balanceo automático de clases desbalanceadas
-- **Métricas CrC1RS**: Sistema de evaluación personalizada con métrica CrC1RS
-- **Logging Completo**: Monitoreo con TensorBoard y Weights & Biases
-- **Visualizaciones**: Gráficas comparativas y de evolución del entrenamiento
-- **Checkpoints**: Sistema de guardado automático y early stopping
-- **Sistema de Pickle**: Guardado completo de modelos, preprocesadores y resultados
-- **Continuación de Entrenamientos**: Reanudar entrenamientos interrumpidos
-- **Gestión de Experimentos**: Herramientas para manejar múltiples experimentos
-- **Arquitectura Modular**: Código organizado y reutilizable
+Este proyecto implementa un sistema robusto de generación de datos sintéticos que:
 
-## 📁 Estructura del Proyecto
+- Entrena modelos GAN (estándar y Wasserstein) para aprender la distribución de datos reales
+- Genera datos sintéticos con alta fidelidad estadística
+- Evalúa la calidad mediante múltiples métricas personalizadas (CrC1RS)
+- Soporta preprocesamiento automático de datos categóricos y numéricos
+- Guarda modelos, preprocesadores y resultados para reproducibilidad
+- Genera visualizaciones y reportes detallados
 
-```
-Synthetic-Data-Generator/
-├── main.py                    # Aplicación principal
-├── instalar.py               # Instalación automática
-├── datos_ejemplo.csv         # Datos de ejemplo
-├── requirements.txt           # Dependencias
-├── README.md                 # Documentación
-├── configs/                  # Configuraciones
-│   ├── config.yaml          # Configuración general
-│   ├── config_simple.yaml   # Para principiantes
-│   ├── config_financial.yaml # Para datos financieros
-│   └── config_medical.yaml  # Para datos médicos
-├── src/                      # Código fuente
-│   ├── models/              # Modelos GAN
-│   │   ├── generator.py     # Generador
-│   │   ├── discriminator.py # Discriminador
-│   │   └── gan.py          # GAN principal
-│   ├── utils/               # Utilidades
-│   │   ├── data_loader.py   # Carga y preprocesamiento
-│   │   └── metrics.py       # Sistema de métricas
-│   └── training/            # Entrenamiento
-│       └── trainer.py       # Entrenador principal
-├── data/                    # Directorios de datos
-│   ├── raw/                # Datos originales
-│   ├── processed/          # Datos preprocesados
-│   └── synthetic/          # Datos sintéticos
-└── results/                 # Resultados
-    ├── models/             # Modelos entrenados
-    ├── plots/              # Visualizaciones
-    ├── logs/               # Logs de entrenamiento
-    └── synthetic_data/     # Datos sintéticos por época
-```
+## 🚀 Características
 
-## 🚀 Uso
+- **Arquitectura GAN Flexible**: Soporta GAN estándar, Wasserstein GAN y GAN condicional
+- **Preprocesamiento Automático**: Maneja datos numéricos y categóricos, normalización y balanceo de clases
+- **Métricas Avanzadas**: CrC1RS personalizado con correlación, consistencia, robustez y similitud
+- **Gestión de Experimentos**: Sistema de pickle para guardar y cargar modelos, preprocesadores y estados de entrenamiento
+- **Visualizaciones**: Gráficas comparativas y evolución del entrenamiento
+- **Sin Interfaz Gráfica**: Backend no-interactivo para ejecución en servidores
 
-### 1. Instalación
+## 📦 Instalación
+
+### Requisitos
+
+- Python 3.8+
+- pip
+
+### Instalación de Dependencias
+
 ```bash
-# Instalación automática
-python instalar.py
+# Clonar el repositorio
+git clone <repository-url>
+cd Synthetic-Data-Generator
 
-# O instalación manual
+# Instalar dependencias
 pip install -r requirements.txt
 ```
 
-### 2. Uso Básico
-```bash
-# Con datos de ejemplo
-python main.py --data datos_ejemplo.csv --target target --seed 42
+### Dependencias Principales
 
-# Con tus propios datos
-python main.py --data tu_archivo.csv --target columna_objetivo --seed 42
+```
+tensorflow>=2.10.0
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+scipy>=1.7.0
+pyyaml>=5.4.0
 ```
 
-### 3. Sistema de Pickle - Gestión de Experimentos
+## 🏗️ Estructura del Proyecto
 
-#### Listar Experimentos Guardados
-```bash
-# Listar todos los experimentos
-python pickle_utils.py --action list
-
-# Ver detalles de un experimento
-python pickle_utils.py --action details --experiment gan_datos_20241201_143022
+```
+Synthetic-Data-Generator/
+├── configs/                    # Archivos de configuración
+│   ├── config.yaml            # Configuración principal
+│   ├── config_simple.yaml     # Configuración simplificada
+│   └── ...
+├── data/                      # Datos (no incluidos en repo)
+│   ├── raw/
+│   ├── processed/
+│   └── synthetic/
+├── results/                   # Resultados generados
+│   ├── models/               # Modelos entrenados (.pkl)
+│   ├── plots/                # Visualizaciones
+│   ├── synthetic_data/       # Datos sintéticos generados
+│   ├── preprocessors/        # Scalers y encoders
+│   ├── training_state/       # Estados de entrenamiento
+│   └── metrics/              # Métricas guardadas
+├── src/                      # Código fuente
+│   ├── models/
+│   │   ├── generator.py      # Modelo generador
+│   │   ├── discriminator.py  # Modelo discriminador
+│   │   └── gan.py           # Modelo GAN principal
+│   ├── training/
+│   │   └── trainer.py        # Entrenador del GAN
+│   └── utils/
+│       ├── data_loader.py    # Carga y preprocesamiento
+│       ├── metrics.py        # Sistema de métricas
+│       └── pickle_manager.py # Gestión de persistencia
+├── main.py                   # Punto de entrada principal
+├── resume_training.py        # Continuar entrenamientos
+├── pickle_utils.py          # Utilidades para pickles
+└── requirements.txt          # Dependencias
 ```
 
-#### Continuar Entrenamientos Interrumpidos
-```bash
-# Listar experimentos disponibles
-python resume_training.py --list
+## 💻 Uso
 
-# Continuar un entrenamiento específico
-python resume_training.py --experiment gan_datos_20241201_143022 --data datos_ejemplo.csv --target target --epochs 100
+### Uso Básico
+
+```bash
+python main.py --data "datos.csv" --config configs/config.yaml --samples 1000
 ```
 
-#### Comparar Experimentos
-```bash
-# Comparar múltiples experimentos
-python pickle_utils.py --action compare --experiments exp1 exp2 exp3
+### Parámetros
 
-# Exportar experimento completo
-python pickle_utils.py --action export --experiment gan_datos_20241201_143022
-```
-
-#### Limpiar Archivos Antiguos
-```bash
-# Mantener solo los últimos 5 archivos de cada tipo
-python pickle_utils.py --action cleanup --keep_last 5
-```
-
-### 3. Opciones Avanzadas
-```bash
-# Más muestras sintéticas
-python main.py --data datos.csv --target target --samples 5000 --seed 42
-
-# Configuración específica
-python main.py --data datos.csv --target target --config configs/config_simple.yaml --seed 42
-
-# Directorio de salida personalizado
-python main.py --data datos.csv --target target --output mi_resultado --seed 42
-```
-
-### 4. Parámetros Disponibles
-- `--data`: Archivo CSV con los datos (requerido)
-- `--target`: Columna objetivo para balanceo de clases (opcional)
-- `--output`: Directorio de salida (default: results)
+- `--data`: Archivo CSV con los datos de entrenamiento (requerido)
+- `--target`: Columna objetivo para clasificación (opcional)
+- `--output`: Directorio para resultados (default: `results`)
 - `--samples`: Número de muestras sintéticas a generar (default: 1000)
-- `--config`: Archivo de configuración (default: configs/config.yaml)
+- `--config`: Archivo de configuración (default: `configs/config.yaml`)
 - `--seed`: Semilla para reproducibilidad (default: 42)
 
-## ⚙️ Configuraciones Disponibles
+### Ejemplos
 
-### Configuración General (`configs/config.yaml`)
-- Para datos tabulares estándar
-- Arquitectura balanceada
-- Entrenamiento estándar
+#### Ejemplo 1: Generación Básica
 
-### Configuración Simple (`configs/config_simple.yaml`)
-- Para principiantes
-- Entrenamiento rápido (50 épocas)
-- Sin TensorBoard
-- Arquitectura simplificada
+```bash
+python main.py \
+  --data "Online Sales Data.csv" \
+  --config configs/config_simple.yaml \
+  --samples 1000 \
+  --seed 42
+```
 
-### Configuración Financiera (`configs/config_financial.yaml`)
-- Optimizada para datos financieros
-- Arquitectura más profunda
-- Mayor regularización
-- Entrenamiento más conservador
+#### Ejemplo 2: Con Columna Objetivo
 
-### Configuración Médica (`configs/config_medical.yaml`)
-- Para datos médicos sensibles
-- Balanceo de clases automático
-- Evaluación más estricta
-- Entrenamiento muy conservador
+```bash
+python main.py \
+  --data "medical_data.csv" \
+  --target "diagnosis" \
+  --config configs/config_medical.yaml \
+  --samples 5000
+```
+
+#### Ejemplo 3: Continuar Entrenamiento
+
+```bash
+python resume_training.py \
+  --experiment "gan_Online_Sales_Data_20251001_191424" \
+  --data "Online Sales Data.csv" \
+  --epochs 50
+```
+
+## ⚙️ Configuración
+
+Edita `configs/config.yaml` para ajustar hiperparámetros:
+
+```yaml
+# Configuración de datos
+data:
+  train_split: 0.8
+  validation_split: 0.2
+  random_state: 42
+  normalize: true
+  balance_classes: true
+
+# Configuración del modelo
+model:
+  latent_dim: 100
+  generator_layers: [256, 512, 1024]
+  discriminator_layers: [1024, 512, 256]
+  dropout_rate: 0.3
+  use_batch_norm: true
+
+# Configuración de entrenamiento
+training:
+  batch_size: 64
+  epochs: 1000
+  learning_rate_g: 0.0002
+  learning_rate_d: 0.0002
+  beta_1: 0.5
+  beta_2: 0.999
+  save_interval: 50
+  early_stopping_patience: 100
+
+# Configuración de logging
+logging:
+  log_interval: 10
+  save_plots: true
+  use_tensorboard: false
+```
 
 ## 📊 Métricas de Evaluación
 
-### Métrica CrC1RS Personalizada
-- **Correlación (C)**: Preservación de correlaciones entre variables
-- **Consistencia (C)**: Consistencia estadística con datos reales
-- **Robustez (R)**: Estabilidad ante perturbaciones
-- **Similitud (S)**: Similitud general con datos originales
+### CrC1RS (Correlation, Consistency, Robustness, Similarity)
 
-### Métricas Complementarias
-- **Wasserstein Distance**: Distancia entre distribuciones
-- **Kolmogorov-Smirnov**: Test de igualdad de distribuciones
-- **Jensen-Shannon Divergence**: Medida de similitud distribucional
-- **MSE Estadístico**: Comparación de medias y varianzas
+Métrica personalizada que combina:
 
-## 📈 Interpretación de Resultados
+- **Correlación (α=0.1)**: Similitud entre matrices de correlación
+- **Consistencia (β=0.3)**: Comparación de estadísticas descriptivas
+- **Robustez (γ=0.4)**: Estabilidad ante perturbaciones
+- **Similitud (δ=0.2)**: Distancia de Wasserstein entre distribuciones
 
-### CrC1RS Score
-- **≥ 0.8**: ✅ Excelente calidad
-- **0.6 - 0.8**: ✅ Buena calidad
-- **0.4 - 0.6**: ⚠️ Calidad regular
-- **< 0.4**: ❌ Necesita mejoras
+**Interpretación:**
+- ★★★★★ **0.80 - 1.00**: Excelente calidad
+- ★★★★☆ **0.60 - 0.79**: Buena calidad
+- ★★★☆☆ **0.40 - 0.59**: Calidad regular
+- ★★☆☆☆ **0.00 - 0.39**: Necesita mejoras
 
-### Métricas Complementarias
-- **Wasserstein < 0.1**: Distribuciones muy similares
-- **KS Statistic < 0.1**: Distribuciones estadísticamente similares
-- **Correlación > 0.9**: Correlaciones bien preservadas
+### Métricas Adicionales
 
-## 📊 Resultados Generados
+- Distancia de Wasserstein
+- Test Kolmogorov-Smirnov
+- Divergencia de Jensen-Shannon
+- MSE de medias y desviaciones estándar
 
-El sistema genera automáticamente:
+## 📈 Resultados
 
-### Archivos de Salida
-- **`results/synthetic_data.csv`**: Datos sintéticos generados
-- **`results/evaluation_report.txt`**: Reporte detallado de evaluación
-- **`results/comparison_plots.png`**: Visualizaciones comparativas
+Después de ejecutar el programa, encontrarás:
 
-### Sistema de Pickle - Archivos Guardados
-- **`results/models/`**: Modelos entrenados (generador, discriminador)
-- **`results/preprocessors/`**: Scaler, encoders y preprocesadores
-- **`results/training_state/`**: Estado completo del entrenamiento
-- **`results/results/`**: Resultados y métricas de experimentos
-- **`results/metrics/`**: Métricas de evaluación por época
-- **`results/plots/`**: Gráficas de evolución del entrenamiento
+### Datos Sintéticos
+- `results/synthetic_data.csv` - Datos generados en formato CSV
+- `results/synthetic_data/final_synthetic.csv` - Datos finales del entrenamiento
 
-### Logs de Entrenamiento
-- **`results/logs/`**: Logs de TensorBoard (si está habilitado)
-- **`results/models/`**: Modelos entrenados y checkpoints
-- **`results/plots/`**: Gráficas de evolución del entrenamiento
+### Visualizaciones
+- `results/plots/final_comparison.png` - Comparación de distribuciones
+- `results/plots/training_evolution.png` - Evolución de métricas
+- `results/plots/comparison_plots.png` - Gráficas por característica
 
-## 🎯 Beneficios del Sistema de Pickle
+### Reportes
+- `results/evaluation_report.txt` - Reporte completo de evaluación
+- `results/training_history.csv` - Historial de entrenamiento
 
-### ✅ **Ventajas Principales:**
+### Modelos
+- `results/models/*_generator_epoch_*.pkl` - Generadores guardados
+- `results/models/*_discriminator_epoch_*.pkl` - Discriminadores guardados
 
-1. **Ahorro de Tiempo**: No re-entrenar desde cero
-2. **Reproducibilidad**: Resultados consistentes entre sesiones
-3. **Experimentos Iterativos**: Probar diferentes configuraciones
-4. **Colaboración**: Compartir modelos entrenados fácilmente
-5. **Recuperación**: Continuar entrenamientos interrumpidos
-6. **Análisis**: Comparar múltiples experimentos
-7. **Portabilidad**: Mover experimentos entre máquinas
+### Preprocesadores
+- `results/preprocessors/*_scaler.pkl` - Escaladores
+- `results/preprocessors/*_encoder.pkl` - Codificadores
 
-### 🔧 **Funcionalidades del Sistema:**
+## 🔧 Utilidades
 
-- **Guardado Automático**: Estado completo cada N épocas
-- **Carga Inteligente**: Restaurar desde cualquier punto
-- **Gestión de Versiones**: Múltiples versiones por experimento
-- **Limpieza Automática**: Mantener solo archivos relevantes
-- **Exportación**: Extraer experimentos completos
-- **Comparación**: Analizar múltiples experimentos
+### Listar Experimentos
+
+```bash
+python pickle_utils.py --action list
+```
+
+### Ver Detalles de Experimento
+
+```bash
+python pickle_utils.py --action details --experiment "gan_experiment_20251001"
+```
+
+### Comparar Experimentos
+
+```bash
+python pickle_utils.py --action compare --experiments exp1 exp2 exp3
+```
+
+### Exportar Experimento
+
+```bash
+python pickle_utils.py --action export --experiment "gan_experiment_20251001"
+```
+
+### Limpiar Archivos Antiguos
+
+```bash
+python pickle_utils.py --action cleanup --keep_last 5
+```
+
+## 🐛 Solución de Problemas
+
+### Error: "All arrays must be of the same length"
+- **Solución**: Asegúrate de usar la versión corregida de `trainer.py`
+
+### Error: Ventanas de matplotlib se abren
+- **Solución**: Verifica que `matplotlib.use('Agg')` esté al inicio de `trainer.py` y `metrics.py`
+
+### Error: Memoria insuficiente
+- **Solución**: Reduce `batch_size` en la configuración
+
+### Bajo score CrC1RS
+- **Solución**: Aumenta el número de épocas o ajusta hiperparámetros
+
+## 📝 Notas Técnicas
+
+- **Backend de matplotlib**: Configurado como 'Agg' (no-interactivo) para evitar ventanas emergentes
+- **Gestión de memoria**: Los modelos se guardan en formato pickle para eficiencia
+- **Sincronización de métricas**: Las métricas básicas se registran cada época, las de validación según `log_interval`
+- **Early stopping**: Implementado con paciencia configurable
+
+## 🤝 Contribuciones
+
+Este proyecto fue desarrollado como parte del curso de Inteligencia Computacional en la Universidad Pedagógica y Tecnológica de Colombia (UPTC).
 
 ---
