@@ -138,12 +138,20 @@ class Generator(keras.Model):
             latent_dim = getattr(self, 'latent_dim', 100)
             noise = tf.random.normal((num_samples, latent_dim))
             
+            # DEBUG: Verificar dimensiones
+            print(f"   DEBUG GENERATOR - num_samples: {num_samples}")
+            print(f"   DEBUG GENERATOR - latent_dim: {latent_dim}")
+            print(f"   DEBUG GENERATOR - noise.shape: {noise.shape}")
+            print(f"   DEBUG GENERATOR - output_dim: {self.output_dim}")
+            
             # Generar muestras
             synthetic_data = self(noise, training=False)
             
+            print(f"   DEBUG GENERATOR - synthetic_data.shape: {synthetic_data.shape}")
             return synthetic_data.numpy()
         except Exception as e:
             print(f"Error generando muestras: {e}")
+            print(f"   DEBUG GENERATOR - Exception details: {type(e).__name__}: {str(e)}")
             # Fallback: generar datos aleatorios
             output_dim = self.output_dim
             return np.random.normal(0, 1, (num_samples, output_dim))

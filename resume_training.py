@@ -56,7 +56,7 @@ def resume_training(experiment_name: str,
         train_data, val_data = data_loader.preprocess_data(data, normalize=True, balance_classes=True)
         
         # Obtener características
-        feature_names = [col for col in train_data.columns if col != target_column] if target_column else train_data.columns
+        feature_names = [col for col in train_data.columns if col != target_column] if target_column else train_data.columns.tolist()
         X_train = train_data[feature_names].values
         X_val = val_data[feature_names].values
         

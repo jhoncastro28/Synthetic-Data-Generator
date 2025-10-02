@@ -22,7 +22,7 @@ model:
 # Configuración de entrenamiento - Rápida
 training:
   batch_size: 16          # Batch size muy pequeño
-  epochs: 20             # Muy pocas épocas para demo rápida
+  epochs: 10             # Muy pocas épocas para demo rápida
   learning_rate_g: 0.001  # Learning rate más alto
   learning_rate_d: 0.001
   beta_1: 0.5

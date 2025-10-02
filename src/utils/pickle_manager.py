@@ -404,8 +404,9 @@ class PickleManager:
         if not filepath.exists():
             raise FileNotFoundError(f"Datos sintéticos no encontrados: {filepath}")
         
+        # CORREGIDO: Cambiar pickle.dump por pickle.load
         with open(filepath, 'rb') as f:
-            save_data = pickle.dump(f)
+            save_data = pickle.load(f)
         
         print(f"Datos sintéticos cargados desde: {filepath}")
         return save_data['data'], save_data['feature_names']
@@ -477,12 +478,12 @@ class PickleManager:
             summary['files'][subdir] = [f.name for f in files]
         
         # Encontrar la época más reciente
-        state_files = list((self.base_dir / "training_state").glob(f"{experiment_name}*"))
+        state_files = list((self.base_dir / "training_state").glob(f"*{experiment_name}*"))
         if state_files:
             epochs = []
             for file in state_files:
                 try:
-                    epoch = int(file.stem.split('_epoch_')[1])
+                    epoch = int(file.stem.split('_epoch_')[-1])
                     epochs.append(epoch)
                 except:
                     continue

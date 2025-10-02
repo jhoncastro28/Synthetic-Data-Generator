@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generador de Datos Sintéticos con GAN
-Aplicación principal - Lista para usar
+Aplicación principal - Completamente funcional
 """
 
 import os
@@ -12,6 +12,12 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 import random
+import warnings
+warnings.filterwarnings('ignore')
+
+# Configurar matplotlib ANTES de cualquier otra importación relacionada
+import matplotlib
+matplotlib.use('Agg')  # Backend no-interactivo
 
 # Agregar src al path
 sys.path.append('src')
@@ -22,6 +28,20 @@ from src.models.discriminator import Discriminator
 from src.models.gan import GAN
 from src.training.trainer import GANTrainer
 from src.utils.metrics import SyntheticDataEvaluator
+
+
+def print_header(text):
+    """Imprime un encabezado formateado."""
+    print("\n" + "=" * 60)
+    print(text.center(60))
+    print("=" * 60 + "\n")
+
+
+def print_step(step_num, title):
+    """Imprime el número de paso."""
+    print(f"\n{'=' * 60}")
+    print(f"PASO {step_num}: {title}")
+    print("=" * 60 + "\n")
 
 
 def main():
@@ -36,42 +56,55 @@ def main():
     
     args = parser.parse_args()
     
-    print("GENERADOR DE DATOS SINTETICOS CON GAN")
-    print("=" * 50)
+    # Encabezado
+    print_header("GENERADOR DE DATOS SINTÉTICOS CON GAN")
     
     # Semillas globales
     try:
         import tensorflow as tf
-    except Exception:
-        tf = None
+        tf.random.set_seed(args.seed)
+    except Exception as e:
+        print(f"Advertencia: No se pudo configurar seed de TensorFlow: {e}")
+    
     random.seed(args.seed)
     np.random.seed(args.seed)
-    if tf is not None:
-        try:
-            tf.random.set_seed(args.seed)
-        except Exception:
-            pass
 
     # Crear directorios
     Path(args.output).mkdir(parents=True, exist_ok=True)
     
     try:
-        # 1. Cargar datos
-        print(f"\nCargando datos desde: {args.data}")
+        # ========== PASO 1: CARGAR DATOS ==========
+        print_step(1, "CARGA DE DATOS")
+        
+        print(f"Cargando datos desde: {args.data}")
         data_loader = DataLoader(args.config)
         data = data_loader.load_data(args.data, target_column=args.target)
-        print(f"   Datos cargados: {data.shape}")
+        print(f"✓ Datos cargados: {data.shape}")
+        print(f"  Columnas: {list(data.columns)}\n")
         
-        # 2. Preprocesar datos
-        print("\nPreprocesando datos...")
+        # ========== PASO 2: PREPROCESAR DATOS ==========
+        print_step(2, "PREPROCESAMIENTO DE DATOS")
+        
+        print("Preprocesando datos...")
         train_data, val_data = data_loader.preprocess_data(data, normalize=True, balance_classes=True)
-        print(f"   Entrenamiento: {train_data.shape}")
-        print(f"   Validacion: {val_data.shape}")
         
-        # 3. Crear modelos
-        print("\nCreando modelos GAN...")
-        feature_names = [col for col in train_data.columns if col != args.target] if args.target else train_data.columns
+        print(f"✓ Preprocesamiento completado:")
+        print(f"  • Entrenamiento: {train_data.shape}")
+        print(f"  • Validación: {val_data.shape}")
+        
+        # Guardar conjunto de validación
+        val_path = os.path.join(args.output, 'validation_set.csv')
+        val_data.to_csv(val_path, index=False)
+        print(f"  • Validación guardada: {val_path}\n")
+        
+        # ========== PASO 3: CREAR MODELOS ==========
+        print_step(3, "CREACIÓN DEL MODELO GAN")
+        
+        print("Creando arquitectura GAN...")
+        feature_names = [col for col in train_data.columns if col != args.target] if args.target else train_data.columns.tolist()
         n_features = len(feature_names)
+        
+        print(f"  • Número de características: {n_features}")
         
         generator = Generator(
             latent_dim=100,
@@ -95,10 +128,14 @@ def main():
             use_wasserstein=True
         )
         
-        print("   Modelos creados")
+        print("✓ Modelos creados:")
+        print("  • Generador: Listo")
+        print("  • Discriminador: Listo")
+        print("  • GAN: Compilado\n")
         
-        # 4. Entrenar
-        print("\nEntrenando modelo...")
+        # ========== PASO 4: ENTRENAR ==========
+        print_step(4, "ENTRENAMIENTO")
+        
         X_train = train_data[feature_names].values
         X_val = val_data[feature_names].values
         
@@ -107,6 +144,7 @@ def main():
         
         trainer = GANTrainer(
             gan_model=gan,
+            config_path=args.config,
             results_dir=args.output,
             use_tensorboard=False,
             use_wandb=False
@@ -115,6 +153,7 @@ def main():
         # Guardar preprocesadores
         trainer.save_preprocessors(data_loader, experiment_name)
         
+        # Entrenar
         results = trainer.train(
             train_data=X_train,
             validation_data=X_val,
@@ -122,71 +161,94 @@ def main():
             experiment_name=experiment_name
         )
         
-        print(f"   Entrenamiento completado")
-        print(f"   Mejor score CrC1RS: {results['best_crc1rs_score']:.4f}")
+        print(f"\n✓ Entrenamiento completado")
+        print(f"  • Tiempo: {results.get('training_time', 'N/A')}")
+        print(f"  • Mejor CrC1RS: {results['best_crc1rs_score']:.4f}\n")
         
-        # 5. Generar datos sintéticos
-        print(f"\nGenerando {args.samples} muestras sinteticas...")
+        # ========== PASO 5: GENERAR DATOS SINTÉTICOS ==========
+        print_step(5, "GENERACIÓN DE DATOS SINTÉTICOS")
+        
+        print(f"Generando {args.samples} muestras sintéticas...")
         synthetic_data = trainer.generate_synthetic_data(num_samples=args.samples)
         
         # Guardar datos sintéticos
         synthetic_df = pd.DataFrame(synthetic_data, columns=feature_names)
-        output_file = f'{args.output}/synthetic_data.csv'
+        output_file = os.path.join(args.output, 'synthetic_data.csv')
         synthetic_df.to_csv(output_file, index=False)
-        print(f"   Datos sinteticos guardados en: {output_file}")
+        print(f"✓ Datos sintéticos guardados: {output_file}\n")
         
-        # 6. Evaluar calidad
-        print("\nEvaluando calidad...")
+        # ========== PASO 6: EVALUAR CALIDAD ==========
+        print_step(6, "EVALUACIÓN DE CALIDAD")
+        
+        print("Evaluando calidad de datos sintéticos...")
+        
         # Alinear tamaños para evaluación
-        n = min(X_val.shape[0], synthetic_data.shape[0], args.samples)
+        n = min(X_val.shape[0], synthetic_data.shape[0])
         evaluator = SyntheticDataEvaluator(X_val[:n], synthetic_data[:n])
         metrics = evaluator.calculate_all_metrics()
         
-        print(f"   CrC1RS Score: {metrics['crc1rs_score']:.4f}")
-        print(f"   Correlacion: {metrics['correlation_score']:.4f}")
-        print(f"   Similitud: {metrics['similarity_score']:.4f}")
+        print(f"✓ Métricas calculadas:")
+        print(f"  • CrC1RS Score: {metrics.get('crc1rs_score', 0):.4f}")
+        print(f"  • Correlación: {metrics.get('correlation_score', 0):.4f}")
+        print(f"  • Similitud: {metrics.get('similarity_score', 0):.4f}\n")
         
-        # Guardar resultados completos con pickle
+        # Guardar resultados completos
+        final_epoch = results.get('final_epoch', 0)
         trainer.save_experiment_results(
             synthetic_data, feature_names, metrics, 
-            results.get('final_epoch', 0), experiment_name
+            final_epoch, experiment_name
         )
         
         # Generar reporte
-        report_path = f'{args.output}/evaluation_report.txt'
-        report = evaluator.generate_evaluation_report(report_path)
-        print(f"   Reporte guardado en: {report_path}")
+        report_path = os.path.join(args.output, 'evaluation_report.txt')
+        evaluator.generate_evaluation_report(report_path)
+        print(f"✓ Reporte guardado: {report_path}")
         
         # Generar visualizaciones
-        plot_path = f'{args.output}/comparison_plots.png'
+        plot_path = os.path.join(args.output, 'plots', 'comparison_plots.png')
         evaluator.plot_comparison(feature_names, plot_path)
-        print(f"   Visualizaciones guardadas en: {plot_path}")
+        print(f"✓ Visualizaciones guardadas: {plot_path}\n")
         
-        print("\n" + "=" * 50)
-        print("PROCESO COMPLETADO EXITOSAMENTE")
-        print("=" * 50)
-        print(f"\nResultados en: {args.output}/")
-        print(f"Datos sinteticos: {output_file}")
-        print(f"Reporte: {report_path}")
-        print(f"Graficas: {plot_path}")
+        # ========== RESUMEN FINAL ==========
+        print_header("PROCESO COMPLETADO EXITOSAMENTE")
+        
+        print("ARCHIVOS GENERADOS:")
+        print(f"  • Datos sintéticos: {output_file}")
+        print(f"  • Reporte: {report_path}")
+        print(f"  • Gráficas: {plot_path}")
+        print(f"  • Modelos: {args.output}/models/")
+        print(f"  • Preprocesadores: {args.output}/preprocessors/\n")
         
         # Interpretación
-        crc1rs_score = metrics['crc1rs_score']
+        crc1rs_score = metrics.get('crc1rs_score', 0)
+        print("INTERPRETACIÓN DE RESULTADOS:")
         if crc1rs_score >= 0.8:
-            print(f"\nRESULTADO: EXCELENTE (CrC1RS: {crc1rs_score:.4f})")
+            print(f"  ★★★★★ EXCELENTE (CrC1RS: {crc1rs_score:.4f})")
+            print("  Los datos sintéticos son de muy alta calidad.")
         elif crc1rs_score >= 0.6:
-            print(f"\nRESULTADO: BUENO (CrC1RS: {crc1rs_score:.4f})")
+            print(f"  ★★★★☆ BUENO (CrC1RS: {crc1rs_score:.4f})")
+            print("  Los datos sintéticos son de buena calidad.")
         elif crc1rs_score >= 0.4:
-            print(f"\nRESULTADO: REGULAR (CrC1RS: {crc1rs_score:.4f})")
+            print(f"  ★★★☆☆ REGULAR (CrC1RS: {crc1rs_score:.4f})")
+            print("  Los datos sintéticos necesitan mejoras.")
         else:
-            print(f"\nRESULTADO: NECESITA MEJORAS (CrC1RS: {crc1rs_score:.4f})")
+            print(f"  ★★☆☆☆ MEJORABLE (CrC1RS: {crc1rs_score:.4f})")
+            print("  Los datos sintéticos requieren más entrenamiento.")
+        
+        print("\n" + "=" * 60 + "\n")
+        
+        return 0
         
     except Exception as e:
-        print(f"\nError: {e}")
-        print("   Revisa que el archivo de datos existe y tiene el formato correcto")
+        print(f"\n✗ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        print("\nRevisa que:")
+        print("  • El archivo de datos existe y es accesible")
+        print("  • El archivo de configuración es válido")
+        print("  • Hay suficiente espacio en disco")
+        print("  • Las dependencias están instaladas correctamente")
         return 1
-    
-    return 0
 
 
 if __name__ == "__main__":

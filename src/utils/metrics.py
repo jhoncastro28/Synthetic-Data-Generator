@@ -12,6 +12,8 @@ except ImportError:
     from scipy.stats import wasserstein_distance
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
+import matplotlib
+matplotlib.use('Agg')  # CRÍTICO: Configurar backend no-interactivo
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, List, Tuple, Optional, Any
@@ -334,36 +336,37 @@ class SyntheticDataEvaluator:
         report += "RESUMEN EJECUTIVO:\n"
         report += f"- Datos reales: {self.n_real_samples} muestras, {self.n_features} características\n"
         report += f"- Datos sintéticos: {self.n_synthetic_samples} muestras, {self.n_features} características\n"
-        report += f"- Score CrC1RS: {metrics['crc1rs_score']:.4f}\n"
-        report += f"- Correlación promedio: {metrics['correlation_score']:.4f}\n"
-        report += f"- Similitud promedio: {metrics['similarity_score']:.4f}\n\n"
+        report += f"- Score CrC1RS: {metrics.get('crc1rs_score', 0):.4f}\n"
+        report += f"- Correlación promedio: {metrics.get('correlation_score', 0):.4f}\n"
+        report += f"- Similitud promedio: {metrics.get('similarity_score', 0):.4f}\n\n"
         
         # Métricas estadísticas
         report += "MÉTRICAS ESTADÍSTICAS:\n"
-        report += f"- MSE de medias: {metrics['overall_mean_mse']:.6f}\n"
-        report += f"- MSE de desviaciones estándar: {metrics['overall_std_mse']:.6f}\n\n"
+        report += f"- MSE de medias: {metrics.get('overall_mean_mse', 0):.6f}\n"
+        report += f"- MSE de desviaciones estándar: {metrics.get('overall_std_mse', 0):.6f}\n\n"
         
         # Métricas distribucionales
         report += "MÉTRICAS DISTRIBUCIONALES:\n"
-        report += f"- Distancia Wasserstein promedio: {metrics['mean_wasserstein']:.6f}\n"
-        report += f"- Estadístico KS promedio: {metrics['mean_ks_statistic']:.6f}\n"
-        report += f"- Divergencia JS promedio: {metrics['mean_js_divergence']:.6f}\n\n"
+        report += f"- Distancia Wasserstein promedio: {metrics.get('mean_wasserstein', 0):.6f}\n"
+        report += f"- Estadístico KS promedio: {metrics.get('mean_ks_statistic', 0):.6f}\n"
+        report += f"- Divergencia JS promedio: {metrics.get('mean_js_divergence', 0):.6f}\n\n"
         
         # Métricas CrC1RS detalladas
         report += "MÉTRICAS CrC1RS DETALLADAS:\n"
-        report += f"- Score de correlación: {metrics['correlation_score']:.4f}\n"
-        report += f"- Score de consistencia: {metrics['consistency_score']:.4f}\n"
-        report += f"- Score de robustez: {metrics['robustness_score']:.4f}\n"
-        report += f"- Score de similitud: {metrics['similarity_score']:.4f}\n"
-        report += f"- Score CrC1RS total: {metrics['crc1rs_score']:.4f}\n\n"
+        report += f"- Score de correlación: {metrics.get('correlation_score', 0):.4f}\n"
+        report += f"- Score de consistencia: {metrics.get('consistency_score', 0):.4f}\n"
+        report += f"- Score de robustez: {metrics.get('robustness_score', 0):.4f}\n"
+        report += f"- Score de similitud: {metrics.get('similarity_score', 0):.4f}\n"
+        report += f"- Score CrC1RS total: {metrics.get('crc1rs_score', 0):.4f}\n\n"
         
         # Interpretación
+        crc1rs_score = metrics.get('crc1rs_score', 0)
         report += "INTERPRETACIÓN:\n"
-        if metrics['crc1rs_score'] >= 0.8:
+        if crc1rs_score >= 0.8:
             report += "EXCELENTE: Los datos sintéticos son de muy alta calidad.\n"
-        elif metrics['crc1rs_score'] >= 0.6:
+        elif crc1rs_score >= 0.6:
             report += "BUENO: Los datos sintéticos son de buena calidad.\n"
-        elif metrics['crc1rs_score'] >= 0.4:
+        elif crc1rs_score >= 0.4:
             report += "REGULAR: Los datos sintéticos necesitan mejoras.\n"
         else:
             report += "DEFICIENTE: Los datos sintéticos requieren entrenamiento adicional.\n"
@@ -371,6 +374,7 @@ class SyntheticDataEvaluator:
         if save_path:
             with open(save_path, 'w', encoding='utf-8') as f:
                 f.write(report)
+            print(f"Reporte guardado: {save_path}")
         
         return report
     
@@ -386,37 +390,52 @@ class SyntheticDataEvaluator:
         if feature_names is None:
             feature_names = [f'Feature_{i}' for i in range(self.n_features)]
         
-        # Crear figura con subplots
-        n_cols = min(3, self.n_features)
-        n_rows = (self.n_features + n_cols - 1) // n_cols
-        
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
-        if n_rows == 1:
-            axes = axes.reshape(1, -1)
-        elif n_cols == 1:
-            axes = axes.reshape(-1, 1)
-        
-        for i in range(self.n_features):
-            row = i // n_cols
-            col = i % n_cols
-            ax = axes[row, col]
+        try:
+            # Limitar el número de características a visualizar (máximo 12)
+            max_features = min(12, self.n_features)
             
-            # Histogramas superpuestos
-            ax.hist(self.real_data[:, i], alpha=0.7, label='Real', bins=30, density=True)
-            ax.hist(self.synthetic_data[:, i], alpha=0.7, label='Sintético', bins=30, density=True)
-            ax.set_title(f'{feature_names[i]}')
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-        
-        # Ocultar subplots vacíos
-        for i in range(self.n_features, n_rows * n_cols):
-            row = i // n_cols
-            col = i % n_cols
-            axes[row, col].set_visible(False)
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        
-        plt.show()
+            # Crear figura con subplots
+            n_cols = min(3, max_features)
+            n_rows = (max_features + n_cols - 1) // n_cols
+            
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+            
+            # Asegurar que axes sea un array 2D
+            if n_rows == 1 and n_cols == 1:
+                axes = np.array([[axes]])
+            elif n_rows == 1:
+                axes = axes.reshape(1, -1)
+            elif n_cols == 1:
+                axes = axes.reshape(-1, 1)
+            
+            for i in range(max_features):
+                row = i // n_cols
+                col = i % n_cols
+                ax = axes[row, col]
+                
+                # Histogramas superpuestos
+                ax.hist(self.real_data[:, i], alpha=0.7, label='Real', bins=30, density=True, color='blue')
+                ax.hist(self.synthetic_data[:, i], alpha=0.7, label='Sintético', bins=30, density=True, color='orange')
+                ax.set_title(f'{feature_names[i][:30]}', fontsize=10)  # Truncar nombres largos
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3)
+                ax.tick_params(axis='both', which='major', labelsize=8)
+            
+            # Ocultar subplots vacíos
+            for i in range(max_features, n_rows * n_cols):
+                row = i // n_cols
+                col = i % n_cols
+                axes[row, col].set_visible(False)
+            
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                print(f"Visualización guardada: {save_path}")
+            
+            # CRÍTICO: Cerrar la figura para evitar que se muestre
+            plt.close(fig)
+            
+        except Exception as e:
+            print(f"Error generando visualización: {e}")
+            plt.close('all')  # Cerrar todas las figuras en caso de error

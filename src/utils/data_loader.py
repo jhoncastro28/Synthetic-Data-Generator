@@ -122,7 +122,7 @@ class DataLoader:
         if not categorical_columns:
             return data
 
-        self.encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+        self.encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
         encoded_array = self.encoder.fit_transform(features_df[categorical_columns])
         encoded_cols = self.encoder.get_feature_names_out(categorical_columns)
 
@@ -192,7 +192,7 @@ class DataLoader:
             data,
             train_size=train_split,
             random_state=random_state,
-            stratify=data[self.target_column] if self.target_column else None
+            stratify=data[self.target_column] if self.target_column and self.target_column in data.columns else None
         )
         
         return train_data, val_data

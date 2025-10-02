@@ -101,3 +101,5 @@ results/*.json
 *.tmp
 *.temp
 *.log
+
+/results

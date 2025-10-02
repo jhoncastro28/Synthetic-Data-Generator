@@ -7,6 +7,8 @@ import os
 import json
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')  # CRÍTICO: Configurar backend no-interactivo ANTES de importar pyplot
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
@@ -19,7 +21,6 @@ from tensorflow import keras
 from tensorflow.keras import optimizers, callbacks
 
 from ..utils.pickle_manager import PickleManager
-
 from ..models.gan import GAN, ConditionalGAN
 from ..utils.metrics import SyntheticDataEvaluator
 from ..utils.data_loader import DataLoader
@@ -64,12 +65,16 @@ class GANTrainer:
         # Inicializar logging
         self._setup_logging()
         
-        # Historial de entrenamiento
+        # Historial de entrenamiento - CORREGIDO: Inicializar todas las listas
         self.training_history = {
             'generator_loss': [],
             'discriminator_loss': [],
             'discriminator_real': [],
             'discriminator_fake': [],
+            'correlation_score': [],
+            'consistency_score': [],
+            'robustness_score': [],
+            'similarity_score': [],
             'crc1rs_score': [],
             'epochs': []
         }
@@ -140,6 +145,8 @@ class GANTrainer:
             validation_data: Datos de validación
             feature_names: Nombres de las características
             class_labels: Etiquetas de clase (para GAN condicional)
+            start_epoch: Época inicial
+            experiment_name: Nombre del experimento
             
         Returns:
             Diccionario con resultados del entrenamiento
@@ -153,9 +160,6 @@ class GANTrainer:
         
         # Compilar modelo
         self._compile_model()
-        
-        # Configurar callbacks
-        callbacks_list = self._setup_callbacks()
         
         # Preparar datos
         if isinstance(self.gan_model, ConditionalGAN) and class_labels is not None:
@@ -175,7 +179,9 @@ class GANTrainer:
                 train_dataset, 
                 validation_data, 
                 feature_names,
-                class_labels
+                class_labels,
+                start_epoch,
+                experiment_name
             )
             
         except KeyboardInterrupt:
@@ -189,6 +195,7 @@ class GANTrainer:
         # Generar reporte final
         results = self._generate_final_report(validation_data, feature_names)
         results['training_time'] = str(training_time)
+        results['final_epoch'] = len(self.training_history['epochs']) - 1 if self.training_history['epochs'] else 0
         
         return results
     
@@ -217,36 +224,6 @@ class GANTrainer:
             discriminator_optimizer=self.discriminator_optimizer
         )
     
-    def _setup_callbacks(self) -> List[callbacks.Callback]:
-        """Configura los callbacks de entrenamiento."""
-        callbacks_list = []
-        
-        # Early stopping
-        early_stopping = callbacks.EarlyStopping(
-            monitor='generator_loss',
-            patience=self.config['training']['early_stopping_patience'],
-            restore_best_weights=True,
-            mode='min'
-        )
-        callbacks_list.append(early_stopping)
-        
-        # Model checkpoint
-        checkpoint_path = os.path.join(self.results_dir, 'models', 'best_model.weights.h5')
-        model_checkpoint = callbacks.ModelCheckpoint(
-            filepath=checkpoint_path,
-            monitor='generator_loss',
-            save_best_only=True,
-            mode='min',
-            save_weights_only=True
-        )
-        callbacks_list.append(model_checkpoint)
-        
-        # TensorBoard
-        if self.use_tensorboard:
-            callbacks_list.append(self.tensorboard_callback)
-        
-        return callbacks_list
-    
     def _manual_training_loop(self, 
                               train_dataset: tf.data.Dataset,
                               validation_data: np.ndarray,
@@ -263,6 +240,9 @@ class GANTrainer:
             # Entrenar una época
             epoch_metrics = self._train_epoch(train_dataset)
             
+            # CORREGIDO: Siempre actualizar historial básico
+            self._update_basic_history(epoch, epoch_metrics)
+            
             # Evaluar en datos de validación solo cada log_interval
             if epoch % log_interval == 0:
                 try:
@@ -270,12 +250,19 @@ class GANTrainer:
                         validation_data, feature_names, class_labels
                     )
                     epoch_metrics.update(validation_metrics)
+                    
+                    # Actualizar métricas de validación en el historial
+                    for key in ['correlation_score', 'consistency_score', 'robustness_score', 
+                               'similarity_score', 'crc1rs_score']:
+                        if key in validation_metrics:
+                            self.training_history[key].append(validation_metrics[key])
+                    
                 except Exception as e:
                     print(f"Error en evaluación: {e}")
-                    # Continuar sin evaluación si hay error
-            
-            # Actualizar historial
-            self._update_training_history(epoch, epoch_metrics)
+                    # Agregar valores por defecto si hay error
+                    for key in ['correlation_score', 'consistency_score', 'robustness_score', 
+                               'similarity_score', 'crc1rs_score']:
+                        self.training_history[key].append(0.0)
             
             # Logging
             if epoch % log_interval == 0:
@@ -293,6 +280,14 @@ class GANTrainer:
                 print(f"Early stopping en época {epoch}")
                 break
     
+    def _update_basic_history(self, epoch: int, metrics: Dict[str, float]):
+        """NUEVO: Actualiza solo el historial básico (sin métricas de validación)."""
+        self.training_history['epochs'].append(epoch)
+        
+        for key in ['generator_loss', 'discriminator_loss', 'discriminator_real', 'discriminator_fake']:
+            if key in metrics:
+                self.training_history[key].append(float(metrics[key]))
+    
     def _train_epoch(self, train_dataset: tf.data.Dataset) -> Dict[str, float]:
         """Entrena una época completa."""
         epoch_metrics = {
@@ -306,8 +301,6 @@ class GANTrainer:
         
         for batch in train_dataset:
             if isinstance(self.gan_model, ConditionalGAN):
-                # Para GAN condicional, necesitamos etiquetas
-                # Por ahora, generamos etiquetas aleatorias
                 batch_data, batch_labels = batch
             else:
                 batch_data = batch
@@ -321,13 +314,15 @@ class GANTrainer:
             
             # Acumular métricas
             for key, value in metrics.items():
-                epoch_metrics[key] += value.numpy()
+                if key in epoch_metrics:
+                    epoch_metrics[key] += float(value.numpy())
             
             num_batches += 1
         
         # Promediar métricas
         for key in epoch_metrics:
-            epoch_metrics[key] /= num_batches
+            if num_batches > 0:
+                epoch_metrics[key] /= num_batches
         
         return epoch_metrics
     
@@ -337,7 +332,7 @@ class GANTrainer:
                                 class_labels: Optional[np.ndarray]) -> Dict[str, float]:
         """Evalúa el modelo en datos de validación."""
         # Generar datos sintéticos
-        num_samples = min(len(validation_data), 1000)  # Limitar para eficiencia
+        num_samples = min(len(validation_data), 1000)
         
         if isinstance(self.gan_model, ConditionalGAN) and class_labels is not None:
             synthetic_data = self.gan_model.generate_synthetic_data(
@@ -354,23 +349,11 @@ class GANTrainer:
         
         metrics = evaluator.calculate_crc1rs_metric()
         
-        return metrics
-    
-    def _update_training_history(self, epoch: int, metrics: Dict[str, float]):
-        """Actualiza el historial de entrenamiento."""
-        self.training_history['epochs'].append(epoch)
-        
-        for key, value in metrics.items():
-            if key in self.training_history:
-                self.training_history[key].append(value)
-        
         # Actualizar mejor modelo
-        if 'crc1rs_score' in metrics:
-            if metrics['crc1rs_score'] > self.best_crc1rs_score:
-                self.best_crc1rs_score = metrics['crc1rs_score']
-                self.best_model_path = os.path.join(
-                    self.results_dir, 'models', f'best_model_epoch_{epoch}'
-                )
+        if metrics['crc1rs_score'] > self.best_crc1rs_score:
+            self.best_crc1rs_score = metrics['crc1rs_score']
+        
+        return metrics
     
     def _log_epoch(self, epoch: int, metrics: Dict[str, float]):
         """Registra información de la época."""
@@ -389,56 +372,19 @@ class GANTrainer:
         if self.use_wandb:
             self.wandb.log(metrics, step=epoch)
     
-    def _save_checkpoint(self, epoch: int):
-        """Guarda un checkpoint del modelo."""
-        checkpoint_path = os.path.join(
-            self.results_dir, 'models', f'checkpoint_epoch_{epoch}'
-        )
-        self.gan_model.save_model(checkpoint_path)
-        print(f"Checkpoint guardado en época {epoch}")
-    
-    def _generate_visualizations(self, 
-                                 validation_data: np.ndarray,
-                                 feature_names: Optional[List[str]],
-                                 epoch: int):
-        """Genera visualizaciones del progreso."""
-        # Generar datos sintéticos para visualización
-        num_samples = min(len(validation_data), 500)
-        synthetic_data = self.gan_model.generate_synthetic_data(num_samples)
-        
-        # Crear evaluador
-        evaluator = SyntheticDataEvaluator(
-            validation_data[:num_samples], 
-            synthetic_data
-        )
-        
-        # Generar gráficas
-        plot_path = os.path.join(
-            self.results_dir, 'plots', f'comparison_epoch_{epoch}.png'
-        )
-        evaluator.plot_comparison(feature_names, plot_path)
-        
-        # Guardar datos sintéticos
-        synthetic_df = pd.DataFrame(
-            synthetic_data, 
-            columns=feature_names or [f'Feature_{i}' for i in range(synthetic_data.shape[1])]
-        )
-        synthetic_path = os.path.join(
-            self.results_dir, 'synthetic_data', f'synthetic_epoch_{epoch}.csv'
-        )
-        synthetic_df.to_csv(synthetic_path, index=False)
-    
     def _check_early_stopping(self) -> bool:
         """Verifica si se debe aplicar early stopping."""
-        if len(self.training_history['crc1rs_score']) < 10:
+        crc1rs_scores = self.training_history.get('crc1rs_score', [])
+        
+        if len(crc1rs_scores) < 10:
             return False
         
-        # Verificar si no hay mejora en las últimas 10 épocas
-        recent_scores = self.training_history['crc1rs_score'][-10:]
-        if len(recent_scores) >= 10:
-            best_recent = max(recent_scores)
-            if best_recent <= self.best_crc1rs_score * 0.95:  # 5% de tolerancia
-                return True
+        # Verificar si no hay mejora en las últimas 10 mediciones
+        recent_scores = crc1rs_scores[-10:]
+        best_recent = max(recent_scores) if recent_scores else 0
+        
+        if best_recent <= self.best_crc1rs_score * 0.95:  # 5% de tolerancia
+            return True
         
         return False
     
@@ -469,10 +415,25 @@ class GANTrainer:
         final_synthetic_path = os.path.join(self.results_dir, 'synthetic_data', 'final_synthetic.csv')
         synthetic_df.to_csv(final_synthetic_path, index=False)
         
-        # Guardar historial de entrenamiento
-        history_df = pd.DataFrame(self.training_history)
-        history_path = os.path.join(self.results_dir, 'training_history.csv')
-        history_df.to_csv(history_path, index=False)
+        # CORREGIDO: Guardar historial de entrenamiento con longitudes verificadas
+        try:
+            # Asegurar que todas las listas tienen la misma longitud
+            min_length = min(len(v) for v in self.training_history.values() if isinstance(v, list))
+            
+            # Truncar todas las listas a la longitud mínima
+            truncated_history = {}
+            for key, value in self.training_history.items():
+                if isinstance(value, list):
+                    truncated_history[key] = value[:min_length]
+                else:
+                    truncated_history[key] = value
+            
+            history_df = pd.DataFrame(truncated_history)
+            history_path = os.path.join(self.results_dir, 'training_history.csv')
+            history_df.to_csv(history_path, index=False)
+        except Exception as e:
+            print(f"Advertencia: No se pudo guardar el historial de entrenamiento: {e}")
+            history_path = None
         
         # Gráfica de evolución de métricas
         self._plot_training_evolution()
@@ -491,45 +452,63 @@ class GANTrainer:
         if not self.training_history['epochs']:
             return
         
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        
-        # Loss del generador
-        axes[0, 0].plot(self.training_history['epochs'], self.training_history['generator_loss'])
-        axes[0, 0].set_title('Generator Loss')
-        axes[0, 0].set_xlabel('Epoch')
-        axes[0, 0].set_ylabel('Loss')
-        axes[0, 0].grid(True)
-        
-        # Loss del discriminador
-        axes[0, 1].plot(self.training_history['epochs'], self.training_history['discriminator_loss'])
-        axes[0, 1].set_title('Discriminator Loss')
-        axes[0, 1].set_xlabel('Epoch')
-        axes[0, 1].set_ylabel('Loss')
-        axes[0, 1].grid(True)
-        
-        # Score del discriminador
-        axes[1, 0].plot(self.training_history['epochs'], self.training_history['discriminator_real'], label='Real')
-        axes[1, 0].plot(self.training_history['epochs'], self.training_history['discriminator_fake'], label='Fake')
-        axes[1, 0].set_title('Discriminator Scores')
-        axes[1, 0].set_xlabel('Epoch')
-        axes[1, 0].set_ylabel('Score')
-        axes[1, 0].legend()
-        axes[1, 0].grid(True)
-        
-        # CrC1RS Score
-        if self.training_history['crc1rs_score']:
-            axes[1, 1].plot(self.training_history['epochs'], self.training_history['crc1rs_score'])
-            axes[1, 1].set_title('CrC1RS Score')
-            axes[1, 1].set_xlabel('Epoch')
-            axes[1, 1].set_ylabel('Score')
-            axes[1, 1].grid(True)
-        
-        plt.tight_layout()
-        
-        # Guardar gráfica
-        evolution_path = os.path.join(self.results_dir, 'plots', 'training_evolution.png')
-        plt.savefig(evolution_path, dpi=300, bbox_inches='tight')
-        plt.show()
+        try:
+            fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+            
+            # Loss del generador
+            if self.training_history['generator_loss']:
+                axes[0, 0].plot(self.training_history['epochs'], 
+                               self.training_history['generator_loss'])
+                axes[0, 0].set_title('Generator Loss')
+                axes[0, 0].set_xlabel('Epoch')
+                axes[0, 0].set_ylabel('Loss')
+                axes[0, 0].grid(True)
+            
+            # Loss del discriminador
+            if self.training_history['discriminator_loss']:
+                axes[0, 1].plot(self.training_history['epochs'], 
+                               self.training_history['discriminator_loss'])
+                axes[0, 1].set_title('Discriminator Loss')
+                axes[0, 1].set_xlabel('Epoch')
+                axes[0, 1].set_ylabel('Loss')
+                axes[0, 1].grid(True)
+            
+            # Score del discriminador
+            if self.training_history['discriminator_real'] and self.training_history['discriminator_fake']:
+                axes[1, 0].plot(self.training_history['epochs'], 
+                               self.training_history['discriminator_real'], label='Real')
+                axes[1, 0].plot(self.training_history['epochs'], 
+                               self.training_history['discriminator_fake'], label='Fake')
+                axes[1, 0].set_title('Discriminator Scores')
+                axes[1, 0].set_xlabel('Epoch')
+                axes[1, 0].set_ylabel('Score')
+                axes[1, 0].legend()
+                axes[1, 0].grid(True)
+            
+            # CrC1RS Score
+            if self.training_history.get('crc1rs_score'):
+                # Crear eje x solo para los puntos donde hay medición
+                log_interval = self.config['logging']['log_interval']
+                epochs_with_crc1rs = [e for e in self.training_history['epochs'] 
+                                     if e % log_interval == 0][:len(self.training_history['crc1rs_score'])]
+                
+                axes[1, 1].plot(epochs_with_crc1rs, self.training_history['crc1rs_score'])
+                axes[1, 1].set_title('CrC1RS Score')
+                axes[1, 1].set_xlabel('Epoch')
+                axes[1, 1].set_ylabel('Score')
+                axes[1, 1].grid(True)
+            
+            plt.tight_layout()
+            
+            # Guardar gráfica
+            evolution_path = os.path.join(self.results_dir, 'plots', 'training_evolution.png')
+            plt.savefig(evolution_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)  # CRÍTICO: Cerrar la figura explícitamente
+            print(f"Gráfica de evolución guardada: {evolution_path}")
+            
+        except Exception as e:
+            print(f"Error generando gráfica de evolución: {e}")
+            plt.close('all')  # Cerrar todas las figuras en caso de error
     
     def load_best_model(self):
         """Carga el mejor modelo guardado."""
